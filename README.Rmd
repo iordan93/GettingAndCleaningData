@@ -1,0 +1,89 @@
+---
+title: "README"
+output: html_document
+---
+
+## Project Description
+The purpose of this project is to demonstrate your ability to collect, work with, and clean a data set. The goal is to prepare tidy data that can be used for later analysis. You will be graded by your peers on a series of yes/no questions related to the project. You will be required to submit: 1) a tidy data set as described below, 2) a link to a Github repository with your script for performing the analysis, and 3) a code book that describes the variables, the data, and any transformations or work that you performed to clean up the data called CodeBook.md. You should also include a README.md in the repo with your scripts. This repo explains how all of the scripts work and how they are connected. 
+
+One of the most exciting areas in all of data science right now is wearable computing - see for example this article . Companies like Fitbit, Nike, and Jawbone Up are racing to develop the most advanced algorithms to attract new users. The data linked to from the course website represent data collected from the accelerometers from the Samsung Galaxy S smartphone. A full description is available at the site where the data was obtained:
+
+http://archive.ics.uci.edu/ml/datasets/Human+Activity+Recognition+Using+Smartphones
+
+Here are the data for the project:
+
+https://d396qusza40orc.cloudfront.net/getdata%2Fprojectfiles%2FUCI%20HAR%20Dataset.zip
+
+ You should create one R script called run_analysis.R that does the following. 
+
+1. Merges the training and the test sets to create one data set.
+2. Extracts only the measurements on the mean and standard deviation for each measurement. 
+3. Uses descriptive activity names to name the activities in the data set
+4. Appropriately labels the data set with descriptive variable names. 
+5. From the data set in step 4, creates a second, independent tidy data set with the average of each variable for each activity and each subject.
+
+Good luck!
+
+## How the script works
+1. The script reads all files, containing the training and testing data:
+```{r}
+# Read all files
+# Read training files: training set (X_train), training labels (y_train), training subjects (subject_train)
+training_set <- read.table("train/X_train.txt", header = FALSE) # 7352 obs. of 561 variables
+training_labels <- read.table("train/y_train.txt", header = FALSE)
+training_subjects <- read.table("train/subject_train.txt", header = FALSE)
+
+# Read test files: test set (X_test), test labels (y_test), test subjects (subject_test)
+test_set <- read.table("test/X_test.txt", header = FALSE) # 2947 obs. of 561 variables
+test_labels <- read.table("test/y_test.txt", header = FALSE)
+test_subjects <- read.table("test/subject_test.txt", header = FALSE)
+```
+
+2. After loading all the neccessary data, the script merges the testing and training tables
+```{r}
+# Merge the corresponding sets
+full_set <- rbind(training_set, test_set)
+full_labels <- rbind(training_labels, test_labels)
+full_subjects <- rbind(training_subjects, test_subjects)
+```
+and removes the old, non-merged sets from the memory
+
+3. The script renames the $full\_subjects$ column name to $"subject"$ and $full\_labels$ column name to $"activity"$, and then loads all other feature names from the file features.txt
+```{r}
+# Set the proper names to the columns
+names(full_subjects) <- c("subject")
+names(full_labels) <- c("activity")
+features <- read.table("features.txt", header = FALSE, stringsAsFactors = FALSE)$V2
+names(full_set) <- features
+
+# Make one dataset with the specified columns
+result_data <- cbind(full_set, cbind(full_subjects, full_labels))
+```
+
+4. After that, the script gets only the features which contain either mean or standard deviation and selects only them from the dataset:
+```{r}
+# Find which columns contain the measurements needed
+selected_features <- c(features[grep("mean\\(\\)|std\\(\\)", features)])
+
+# Subset the data based on the selected features (and the subject and activity columns)
+result_data <- subset(result_data, select = c("subject", "activity", selected_features))
+```
+
+5. Then the script uses the loaded feature names, as well as the $subject$ and $activity$ features, to make them human-readable (foe example, we get activity descriptions like SITTING, WALKING, etc., not numbers). It also changes the prefixes "t" and "f", which, according to the features_info.txt file, mean "time" and "frequency"
+```{r}
+# 3. Use descriptive activity names to name the activities in the data set
+activities <- read.table("activity_labels.txt", header = FALSE)$V2
+result_data$activity <- activities[result_data$activity]
+
+# 4. Appropriately label the data set with descriptive variable names
+# Rename the column names according to the features_info file: the prefix "t" means "time" and "f" means "frequency"
+names(result_data) <- gsub("^t", "time", names(result_data))
+names(result_data) <- gsub("^f", "frequency", names(result_data))
+```
+
+6. Having now created a tidy table, with rows for observations, columns for features, and being human-readable, it is written to a file
+```{r}
+# 5. Create a second, independent tidy data set with the average of each variable for each activity and each subject
+second_data <- aggregate(. ~ subject + activity, data = result_data, FUN = mean) # 180 obs. of 68 variables
+write.table(second_data, "tidy_data.txt", row.name = FALSE) 
+```
